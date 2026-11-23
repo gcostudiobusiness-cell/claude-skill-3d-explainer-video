@@ -31,3 +31,13 @@
 ## Length
 Covering every required section pushed the cut to ~2:06 (robot voices) / ~2:39 (human voices) vs a 78 s sample.
 Decide early whether the brief or the format wins.
+
+## Found while building the starter engine
+- Use `frameSubject()` (src/engine/Cam.tsx) instead of guessing camera numbers. In the first stills pass, a
+  hand-placed camera hid the character's feet behind the captions and pushed a prop off the right edge.
+- Stamps default to the card zone (top ≈ 17 %); at 38 % they covered the character's face.
+- `say` gives no word timings: the engine estimates them from word length and punctuation, so captions can
+  drift slightly. ElevenLabs `with-timestamps` gives exact times.
+- On first render Remotion downloads its own headless Chrome (~140 MB) into node_modules. That's expected and
+  isn't a failure.
+- R3F logs "THREE.Clock: This module has been deprecated" on every frame. It's harmless.

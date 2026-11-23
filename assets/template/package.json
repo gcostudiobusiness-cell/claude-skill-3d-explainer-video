@@ -1,0 +1,35 @@
+{
+  "name": "explainer-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate-lines.mjs",
+    "audio": "node scripts/build-audio.mjs",
+    "stills": "node scripts/stills.mjs",
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit --noUnusedLocals",
+    "render": "remotion render src/index.ts Main out/video.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p --gl=angle",
+    "verify": "node scripts/verify.mjs out/video.mp4"
+  },
+  "dependencies": {
+    "@fontsource/anton": "5.3.0",
+    "@fontsource/poppins": "5.3.0",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
+    "@remotion/bundler": "4.0.546",
+    "@remotion/cli": "4.0.546",
+    "@remotion/fonts": "4.0.546",
+    "@remotion/renderer": "4.0.546",
+    "@remotion/three": "4.0.546",
+    "lucide-react": "1.78.0",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
+    "remotion": "4.0.546",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/three": "0.187.0",
+    "typescript": "5.9.3"
+  }
+}

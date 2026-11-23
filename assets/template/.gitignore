@@ -1,0 +1,8 @@
+node_modules/
+node_modules.nosync/
+cache/
+out/
+.env
+public/audio/
+src/timeline.json
+.DS_Store

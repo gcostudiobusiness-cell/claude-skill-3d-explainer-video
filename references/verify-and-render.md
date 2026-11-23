@@ -29,3 +29,7 @@ ffmpeg -i out/video.mp4 -af ebur128 -f null - 2>&1 | tail -12               # In
 ffmpeg -i out/video.mp4 -vf "fps=1/3,scale=270:-1,tile=6x4" sheet_%02d.jpg   # contact sheet FROM THE MP4 → look
 ffmpeg -sseof -1 -i out/video.mp4 -frames:v 1 endcard.png                   # last-second frame = end card
 ```
+
+## In the template these are npm scripts
+`npm run stills -- mid,beats pass1` · `npm run render` · `npm run verify` (runs all four checks above and
+writes `out/verify/mp4-sheet.jpg` + `out/verify/endcard.png`).

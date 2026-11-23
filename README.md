@@ -76,6 +76,7 @@ references/
   3d-and-overlays.md             characters, sets, props, lighting, captions, comedy toolkit
   verify-and-render.md           ffmpeg analysis, stills, render and MP4 checks
   gotchas.md                     known pitfalls and their fixes
+assets/template/                 starter engine: copy to begin a video (see its README)
 ```
 
 Claude loads each reference file only during the phase that needs it, which keeps the context small.
@@ -83,6 +84,10 @@ Claude loads each reference file only during the phase that needs it, which keep
 ## Status
 
 - The method and references come from one real build.
-- **No starter code yet:** the audio build scripts, synth, stills tool, overlays, character and prop kit, and an
-  example `lines.json` don't exist as reusable code. For now Claude builds them from the reference files for each
-  video. A starter template is planned.
+- **Starter engine included** in [`assets/template/`](assets/template/): the audio pipeline, timeline helpers,
+  camera/lighting/studio helpers, overlays, and the stills and verification tools. A clean copy installs, builds
+  audio with `say`, renders a 15-second demo and passes all four MP4 checks.
+- The engine is reused; each video's characters, sets and scenes are designed fresh from its sample. The demo
+  scenes in `src/scenes/example/` are only there to show the techniques.
+- Not yet tested: the ElevenLabs path against the live API. Its code, cost dry run and credit guard are in
+  place, but they need a real key to test.

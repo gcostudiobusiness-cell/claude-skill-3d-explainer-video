@@ -63,8 +63,9 @@ wait for the user.
 ### 4. Concept + script — load `references/lines-schema.md` ⛔
 - Pick a narrative device that makes the content land (e.g. an object narrator that roasts the subject).
 - One scene per required section + hook + title + outro. Short lines, punchline on the last word.
-- Write `script/lines.json`; run the validator (every `hl` word exists, every SFX word index points at the
-  intended word).
+- Write `script/lines.json`; run `npm run validate`. It checks highlights, word indexes and SFX names, and prints
+  each cue next to the word it lands on. **Read that output**, because a valid index can still point at the wrong
+  word.
 - **⛔ Gate:** user approves the script (show it as readable text, not JSON) and the length estimate.
 
 ### 5. Voice audition — load `references/audio-build.md` ⛔
@@ -78,8 +79,11 @@ wait for the user.
 - **Exit:** master at ≈ −14 LUFS; timeline has scene/line/word times, cues, mouth envelopes.
 
 ### 7. Scenes — load `references/layout-and-contract.md`, `references/3d-and-overlays.md`
-- Build characters/sets/props from the kit; one `Scene3D` + `SceneUI` per scene, all timed via `sf(id)` helpers.
-- Respect portrait framing limits (`references/gotchas.md` → Framing).
+- Design this video's own characters, sets and props from the style notes. The techniques in
+  `3d-and-overlays.md` are a toolbox, not a menu. Scenes don't have to follow any previous video.
+- One `SceneDef` (`Scene3D` + optional `SceneUI`) per scene kind, registered in `src/scenes/index.ts`, and all
+  timed via `sf(scene)`. Unregistered scenes render with the default studio, so build them one at a time.
+- Frame with `frameSubject()` and keep props inside its `halfW` (`references/gotchas.md` → Framing).
 - **Exit:** typecheck clean (`--noUnusedLocals`); every scene renders a still.
 
 ### 8. Stills review loop — load `references/verify-and-render.md`
@@ -87,8 +91,9 @@ wait for the user.
 - **Exit:** at least **2 passes**; no off-screen props, clipped captions or broken poses.
 
 ### 9. Render + verify — load `references/verify-and-render.md`
-- Full render; then decode check (0 errors), `ebur128` (≈ −14 LUFS), contact sheet **from the MP4**, last-second
-  frame (end card).
+- `npm run render`, then `npm run verify`: decode check (0 errors), loudness (≈ −14 LUFS), contact sheet **from
+  the MP4**, last-second frame (end card). Look at both images.
+- Claude can't hear audio: ask the user to listen to the music/SFX balance before delivery.
 - **Exit:** all four checks pass.
 
 ### 10. Deliver ⛔
@@ -107,9 +112,15 @@ wait for the user.
 | `references/verify-and-render.md` | 2, 8, 9 | ffmpeg analysis, stills, MP4 verification, render command |
 | `references/gotchas.md` | any time something breaks | Framing, Remotion+R3F, audio, environment, length |
 
-## Template status
+## Starter engine — `assets/template/`
 
-There is **no starter code yet**, and no existing project to copy it from. Build each new video from the
-references: `layout-and-contract.md` lists the files to create (`build-audio.mjs`, `voices.mjs`, `synth.mjs`,
-`wav.mjs`, `stills.mjs`, `eleven.mjs`, `Overlays.tsx`, `Sets.tsx`, character + prop kit, `lines.json`), and the
-other references describe how each works. Don't go looking for an earlier project's code.
+Copy `assets/template/` to start every video (then `npm ci`). It is an **engine, not a fixed video**:
+
+- **Reuse as-is:** the audio pipeline (`scripts/`), timeline helpers (`src/timeline.ts`), camera/lights/studio/
+  animation helpers (`src/engine/`), and overlays (`src/ui/`).
+- **Design fresh every time:** characters, sets, props, scenes, colours and the narrative device. Base them on the
+  sample's style notes from phase 2, not on the example.
+- The demo in `src/scenes/example/` exists only to show the techniques, and to prove the engine renders. Delete
+  or replace it; never default to its character or look.
+
+See `assets/template/README.md` for commands and how to add a scene.

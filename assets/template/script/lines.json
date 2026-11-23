@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "title": "EXAMPLE — replace this whole file for each video",
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "voiceEngine": "say",
+    "tempo": 1,
+    "bpm": 112,
+    "accent": "#FFD23F",
+    "footer": "your name · your label"
+  },
+  "speakers": {
+    "narrator": {
+      "say": { "voice": "Samantha", "rate": 190 },
+      "eleven": { "voiceId": "", "model": "eleven_v4", "speed": 1.1 }
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "music": "tension",
+      "lines": [
+        { "speaker": "narrator", "text": "POV: you need a video by Friday.", "hl": ["Friday."], "sfx": [{ "name": "pop", "w": 6 }] }
+      ]
+    },
+    {
+      "id": "script",
+      "step": 1,
+      "header": "SCRIPT",
+      "music": "groove",
+      "lines": [
+        { "speaker": "narrator", "text": "Step one. Write the script first.", "hl": ["script"], "cues": [{ "name": "card", "w": 2 }] },
+        { "speaker": "narrator", "text": "Every word becomes a caption.", "hl": ["caption."], "sfx": [{ "name": "ding", "w": 4 }] }
+      ]
+    },
+    {
+      "id": "audio",
+      "step": 2,
+      "header": "AUDIO",
+      "music": "hype",
+      "lines": [
+        { "speaker": "narrator", "text": "Then build the audio.", "hl": ["audio."] },
+        {
+          "speaker": "narrator",
+          "text": "The timeline tells every frame when to move.",
+          "hl": ["timeline"],
+          "sfx": [{ "name": "slam", "w": 7 }],
+          "cues": [{ "name": "stamp", "w": 7 }]
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "music": "soft",
+      "padAfter": 1.2,
+      "lines": [
+        { "speaker": "narrator", "text": "Now go make yours.", "hl": ["yours."], "sfx": [{ "name": "sparkle", "w": 3 }] }
+      ]
+    }
+  ]
+}
