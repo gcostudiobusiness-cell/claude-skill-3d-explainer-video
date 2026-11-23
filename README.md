@@ -82,7 +82,7 @@ Claude loads each reference file only during the phase that needs it, which keep
 
 ## Status
 
-- The method and references come from one real build, the "digital-mirror" video.
-- **Not bundled yet:** the starter code from that build (audio build scripts, synth, stills tool, overlays, the
-  character and prop kit, an example `lines.json`). Until it's added, Claude rebuilds these from the reference
-  files.
+- The method and references come from one real build.
+- **No starter code yet:** the audio build scripts, synth, stills tool, overlays, character and prop kit, and an
+  example `lines.json` don't exist as reusable code. For now Claude builds them from the reference files for each
+  video. A starter template is planned.

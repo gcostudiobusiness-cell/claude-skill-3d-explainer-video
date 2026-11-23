@@ -8,7 +8,7 @@ description: Make a vertical (1080×1920, 30 fps) 3D short-form explainer video 
 Input: a **sample video** (style reference) + **source material**.
 Output: a rendered **1080×1920, 30 fps MP4** — 3D toy-style characters, narration, music bed, SFX, kinetic captions.
 
-Origin: distilled from the `digital-mirror` build (see `references/` for the detail). The gates exist because
+Origin: distilled from one real build (see `references/` for the detail). The gates exist because
 every expensive mistake in that build was either paid TTS credits spent on an unapproved script, or a visual bug
 only visible by looking at rendered frames.
 
@@ -109,7 +109,7 @@ wait for the user.
 
 ## Template status
 
-The `digital-mirror` scaffolding (`build-audio.mjs`, `voices.mjs`, `synth.mjs`, `wav.mjs`, `stills.mjs`,
-`eleven.mjs`, `Overlays.tsx`, `Sets.tsx`, character + prop kit, example `lines.json`) is **not yet bundled** here.
-Until it is: rebuild from the references, or — **with the user's explicit approval**, since it is a separate
-project — copy from the `digital-mirror` project and replace personal details with placeholders.
+There is **no starter code yet**, and no existing project to copy it from. Build each new video from the
+references: `layout-and-contract.md` lists the files to create (`build-audio.mjs`, `voices.mjs`, `synth.mjs`,
+`wav.mjs`, `stills.mjs`, `eleven.mjs`, `Overlays.tsx`, `Sets.tsx`, character + prop kit, `lines.json`), and the
+other references describe how each works. Don't go looking for an earlier project's code.
