@@ -94,3 +94,7 @@ Claude loads each reference file only during the phase that needs it, which keep
   audio with `say`, renders a 15-second demo and passes all MP4 checks, in portrait and landscape.
 - The engine is reused; each video's characters, sets and scenes are designed fresh from its sample. The demo
   scenes in `src/scenes/example/` are only there to show the techniques.
+
+## License
+
+[MIT](LICENSE). Fonts (Anton, Poppins) and npm packages are installed at build time under their own licences.
