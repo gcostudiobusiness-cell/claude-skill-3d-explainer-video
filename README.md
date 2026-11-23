@@ -24,8 +24,10 @@ Ask in plain words, for example:
 
 > Make a 3D animated short in the style of `sample.mp4` from `brief.md`.
 
-Claude asks only what has no sensible default. The main question is how to do the voice: macOS `say` (free,
-robotic), ElevenLabs (paid, human) or your own recording.
+Claude asks only what has no sensible default. The main question is the voice provider, and you can use any:
+macOS `say` (free, robotic), ElevenLabs (paid, human, exact caption sync), your own recordings, a command-line
+TTS such as Piper or Kokoro, OpenAI, or any other service through a small adapter. Different speakers can use
+different providers.
 
 ## How it works
 
@@ -55,7 +57,7 @@ the script and rebuild the audio, the visuals re-sync on their own. Nothing is t
 | Video engine | Remotion 4 |
 | 3D | three.js, @react-three/fiber, @react-three/drei, @remotion/three |
 | UI | React 19, TypeScript, lucide-react, local fonts (Anton, Poppins) |
-| Voice | ElevenLabs `with-timestamps` (word-level caption sync) or macOS `say` |
+| Voice | Your choice: macOS `say`, ElevenLabs (exact caption sync), own recordings, any command-line TTS, OpenAI, or any provider via a small adapter |
 | Music and sound effects | Hand-written Node synth, so there are no licensing questions |
 | Audio processing and checks | ffmpeg |
 

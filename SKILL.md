@@ -34,7 +34,7 @@ only visible by looking at rendered frames.
 | Source material paths | — required |
 | Audience / platform | vertical short-form (TikTok/Reels/Shorts) |
 | Target length | match the sample; flag if the brief can't fit (rule 6) |
-| Voice option | **ask** — `say` (free, robotic) / ElevenLabs (paid, human) / user recording |
+| Voice provider | **ask**, and offer: `say` (free, robotic), ElevenLabs (paid, human, exact caption sync), own recordings, any command-line TTS (Piper, Kokoro, espeak…), OpenAI, or any other provider via a small adapter. Can differ per speaker. |
 | Names / labels shown on screen | none |
 
 ## Phases
@@ -69,12 +69,16 @@ wait for the user.
 - **⛔ Gate:** user approves the script (show it as readable text, not JSON) and the length estimate.
 
 ### 5. Voice audition — load `references/audio-build.md` ⛔
-- Audition 2–4 candidate voices on **real script lines**, not sample text.
-- **⛔ Gate:** user picks voice(s) per speaker.
+- Use the provider the user chose. If it isn't in `scripts/voices/`, write an adapter first (interface in
+  `scripts/voices/README.md`).
+- `npm run audition -- <provider> <voice,…>`: try 2–4 candidates on **real script lines**, not sample text.
+  Paid providers show the cost and need `--yes`, so get the user's OK first.
+- For own recordings: list the files to record (`npm run audio` names every missing one), and skip auditions.
+- **⛔ Gate:** user picks the provider and voice per speaker.
 
 ### 6. Audio build — load `references/audio-build.md` ⛔
-- `npm run audio -- --dry-run` → report credits for un-cached lines.
-- **⛔ Gate:** user approves the credit spend (skip for `say`).
+- `npm run audio -- --dry-run` → per-provider line counts, cost and key status.
+- **⛔ Gate:** user approves any spend (free providers need no approval).
 - Full build → `public/audio/master.wav` + `src/timeline.json`.
 - **Exit:** master at ≈ −14 LUFS; timeline has scene/line/word times, cues, mouth envelopes.
 

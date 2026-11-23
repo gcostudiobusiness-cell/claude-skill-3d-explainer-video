@@ -40,4 +40,6 @@ Decide early whether the brief or the format wins.
   drift slightly. ElevenLabs `with-timestamps` gives exact times.
 - On first render Remotion downloads its own headless Chrome (~140 MB) into node_modules. That's expected and
   isn't a failure.
+- `.m4a` files written by macOS `say --file-format=m4af` contain a header ffmpeg 8.1 can't read. If a recording
+  fails, the build names the file; re-export it as WAV.
 - R3F logs "THREE.Clock: This module has been deprecated" on every frame. It's harmless.

@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Build all audio from script/lines.json and write the timeline every visual keys off.
-//   npm run audio                 build (say engine by default)
-//   npm run audio -- --dry-run    report what would be generated and what it costs
-//   npm run audio -- --yes        allow an ElevenLabs run above MAX_CREDITS
-//   npm run audio -- --engine=eleven   override meta.voiceEngine
+//   npm run audio                       build
+//   npm run audio -- --dry-run          what would be voiced, by which provider, and what it costs
+//   npm run audio -- --yes              allow a run above MAX_CREDITS (billable units, any paid provider)
+//   npm run audio -- --engine=<name>    voice every line with one provider (say, eleven, recording, command, openai…)
+// Provider per line: --engine > speakers.<id>.engine > meta.voiceEngine > say. See scripts/voices/README.md.
 // Outputs: public/audio/master.wav, src/timeline.json
 import fs from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
-import { loadScript, norm, spokenText, eachLine } from "./lib/script.mjs";
-import { renderLine, clipKey, isCached, creditEstimate, loadEnv, keyStatus } from "./lib/voices.mjs";
+import { loadScript, norm, eachLine } from "./lib/script.mjs";
+import { loadEnv, envStatus, loadProviders, engineFor, planLine, renderPlanned, missingEnv, preflight } from "./lib/voices.mjs";
 import { SR, SFX, renderMusic, sting, mixAt } from "./lib/synth.mjs";
 import { writeWav } from "./lib/wav.mjs";
 import { validate } from "./validate-lines.mjs";
@@ -28,32 +29,54 @@ if (problems.length) {
 
 const meta = script.meta ?? {};
 const fps = meta.fps ?? 30;
-const engine = opt("engine") ?? meta.voiceEngine ?? "say";
 const tempo = meta.tempo ?? 1;
 const bpm = meta.bpm ?? 112;
 const MAX_CREDITS = Number(process.env.MAX_CREDITS ?? 3000);
+const providers = await loadProviders();
 
-// ---------- 1. dry run / credit guard ----------
-const jobs = [...eachLine(script)].map(({ scene, line }) => {
-  const speaker = script.speakers[line.speaker];
-  const spoken = spokenText(line, engine);
-  const key = clipKey({ engine, speaker: speaker[engine] ?? speaker, spoken, text: line.text, tempo, v: 1 });
-  return { scene, line, speaker, spoken, key, cached: isCached(key) };
-});
-const todo = jobs.filter((j) => !j.cached);
-const credits = engine === "eleven" ? todo.reduce((s, j) => s + creditEstimate(j.spoken), 0) : 0;
-console.log(`engine: ${engine} · lines: ${jobs.length} · cached: ${jobs.length - todo.length} · to generate: ${todo.length}`);
-if (engine === "eleven") console.log(`ElevenLabs key: ${keyStatus()} · estimated credits: ${credits} (limit ${MAX_CREDITS})`);
-if (flag("dry-run")) {
-  todo.forEach((j) => console.log(`  + [${j.scene.id}] ${j.spoken}`));
-  process.exit(0);
-}
-if (engine === "eleven" && todo.length && !process.env.ELEVENLABS_API_KEY) {
-  console.error("ELEVENLABS_API_KEY missing — add it to .env, or use --engine=say");
+// ---------- 1. plan, dry run, guards ----------
+let jobs;
+try {
+  jobs = [...eachLine(script)].map(({ scene, line, li }) => {
+    const engine = engineFor(script, line.speaker, opt("engine"));
+    const ctx = { sceneId: scene.id, lineIndex: li, speakerId: line.speaker, line };
+    return { scene, line, ...planLine({ providers, engine, speaker: script.speakers[line.speaker], line, ctx, tempo }) };
+  });
+} catch (err) {
+  console.error(err.message);
   process.exit(1);
 }
-if (credits > MAX_CREDITS && !flag("yes")) {
-  console.error(`Refusing: ${credits} credits is above MAX_CREDITS=${MAX_CREDITS}. Re-run with --yes once approved.`);
+const todo = jobs.filter((j) => !j.cached);
+const cost = todo.reduce((s, j) => s + j.cost, 0);
+const byEngine = Object.entries(Object.groupBy(jobs, (j) => j.engine));
+for (const [engine, js] of byEngine) {
+  const p = providers[engine];
+  const c = js.reduce((s, j) => s + j.cost, 0);
+  const env = (p.env ?? []).map((n) => `${n} ${envStatus(n)}`).join(", ");
+  console.log(
+    `${p.label ?? engine}: ${js.length} line(s), ${js.filter((j) => !j.cached).length} to generate` +
+      (p.cost ? ` · ≈ ${c} ${p.costUnit ?? "units"}` : " · free") +
+      (env ? ` · ${env}` : ""),
+  );
+}
+if (flag("dry-run")) {
+  todo.forEach((j) => console.log(`  + [${j.scene.id}] (${j.engine}) ${j.spoken}`));
+  if (cost) console.log(`total billable ≈ ${cost} (limit MAX_CREDITS=${MAX_CREDITS})`);
+  process.exit(0);
+}
+const missing = missingEnv(jobs);
+if (missing.length) {
+  console.error(`Missing ${missing.join(", ")} — add to .env (see .env.example), or pick another provider with --engine=say`);
+  process.exit(1);
+}
+const notReady = preflight(jobs);
+if (notReady.length) {
+  console.error(`${notReady.length} line(s) not ready:`);
+  notReady.forEach((m) => console.error("  ✗ " + m));
+  process.exit(1);
+}
+if (cost > MAX_CREDITS && !flag("yes")) {
+  console.error(`Refusing: ≈ ${cost} billable units is above MAX_CREDITS=${MAX_CREDITS}. Re-run with --yes once approved.`);
   process.exit(2);
 }
 
@@ -69,8 +92,14 @@ for (const [index, scene] of script.scenes.entries()) {
   const cues = [];
   for (const line of scene.lines ?? []) {
     const job = jobs.find((j) => j.line === line);
-    const clip = await renderLine({ engine, speaker: job.speaker, text: line.text, spoken: job.spoken, tempo });
-    if (!clip.cached) process.stdout.write(`  voiced [${scene.id}] ${line.text}\n`);
+    let clip;
+    try {
+      clip = await renderPlanned(job);
+    } catch (err) {
+      console.error(`✗ [${scene.id}] (${job.engine}) "${line.text}": ${err.message}`);
+      process.exit(1);
+    }
+    if (!clip.cached) process.stdout.write(`  voiced [${scene.id}] (${job.engine}) ${line.text}\n`);
     const ls = t;
     const dur = clip.data.length / SR;
     placed.push({ speaker: line.speaker, t: ls, data: clip.data });
@@ -206,7 +235,7 @@ const timeline = {
   footer: meta.footer ?? "",
   accent: meta.accent ?? "#FFD23F",
   totalSteps: steps.length ? Math.max(...steps) : 0,
-  engine,
+  engines: [...new Set(jobs.map((j) => j.engine))],
   scenes,
   mouth,
 };

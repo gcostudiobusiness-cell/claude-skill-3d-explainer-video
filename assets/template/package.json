@@ -5,6 +5,7 @@
   "scripts": {
     "validate": "node scripts/validate-lines.mjs",
     "audio": "node scripts/build-audio.mjs",
+    "audition": "node scripts/audition.mjs",
     "stills": "node scripts/stills.mjs",
     "studio": "remotion studio src/index.ts",
     "typecheck": "tsc --noEmit --noUnusedLocals",

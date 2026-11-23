@@ -19,14 +19,15 @@ scenes from its own sample.
 ```bash
 npm ci                         # install (pinned versions)
 npm run validate               # check lines.json + print it as readable text
-npm run audio -- --dry-run     # what would be voiced, and the credit cost
+npm run audio -- --dry-run     # what would be voiced, by which provider, and the cost
+npm run audition -- say Samantha,Daniel   # try voices on real lines (any provider)
 npm run audio                  # → public/audio/master.wav + src/timeline.json
 npm run typecheck
 npm run stills -- mid,beats pass1   # contact sheet → out/stills/pass1.jpg  (LOOK at it)
 npm run studio                 # live preview in the browser
 npm run render                 # → out/video.mp4
 npm run verify                 # 4 checks on the MP4, then LOOK at out/verify/*
-node scripts/eleven.mjs credits | voices | audition <id,…> [n] [--yes]
+node scripts/eleven.mjs credits | voices          # ElevenLabs account helper
 ```
 
 Audio comes first: `src/timeline.json` is generated and every animation keys off it. Change the script →
@@ -41,12 +42,25 @@ Audio comes first: `src/timeline.json` is generated and every animation keys off
    `src/scenes/index.ts`.
 4. Time everything with `sf(scene)`: `t.line(i)`, `t.word(li, wi)`, `t.cue("name")`.
 
-## Voices
+## Voices: use any provider
 
-- `say` (default): free and offline. Word times are estimated, so captions are close but not exact.
-- ElevenLabs: set `meta.voiceEngine` to `"eleven"`, set each speaker's `eleven.voiceId`, and put the key in
-  `.env`. Word times come from the API, so captions are exact. A build above `MAX_CREDITS` refuses without
-  `--yes`.
+Built in: `say` (default, free), `eleven` (ElevenLabs, exact caption timing), `recording` (your own files),
+`command` (any command-line TTS such as Piper, Kokoro or espeak), and `openai` (example adapter, untested).
+Any other provider is one small file in `scripts/voices/`. See [`scripts/voices/README.md`](scripts/voices/README.md)
+for settings and the adapter interface.
+
+```json
+"meta": { "voiceEngine": "eleven" },
+"speakers": {
+  "narrator": { "eleven": { "voiceId": "…" } },
+  "phone":    { "engine": "say", "say": { "voice": "Daniel" } }
+}
+```
+
+- **Choosing:** `npm run audition -- <provider> <voice,…>` tries voices on your real lines. `npm run audio --
+  --dry-run` shows, per provider, what will be generated, the cost and whether keys are set.
+- **Limits:** paid runs above `MAX_CREDITS` need `--yes`, and missing keys or recordings stop the build before
+  anything is generated.
 
 ## Requirements
 

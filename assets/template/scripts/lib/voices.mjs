@@ -1,14 +1,18 @@
-// Voice engines: macOS `say` (free, offline) and ElevenLabs (paid, exact word timings).
-// Each clip is cached by a hash of every input, so re-running costs nothing.
+// Voice engine core. Providers live in scripts/voices/<name>.mjs (see the README there).
+// This file does everything providers have in common: choosing the provider per line, caching by a hash of
+// every input, cost estimates, env checks, tempo, silence trimming, level matching and word timings.
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { readWav, writeWav } from "./wav.mjs";
 import { SR } from "./synth.mjs";
 import { tokens, norm } from "./script.mjs";
 
 const CACHE = "cache/voice";
+const VOICES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "voices");
+const CACHE_VERSION = 2;
 
 // ---------- .env (no dependency) ----------
 export function loadEnv(file = ".env") {
@@ -18,31 +22,66 @@ export function loadEnv(file = ".env") {
     if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
 }
-/** Never print the key — only whether it is there and how long it is. */
-export function keyStatus() {
-  const k = process.env.ELEVENLABS_API_KEY ?? "";
-  return k ? `set (${k.length} chars)` : "missing";
+/** Never print a key — only whether it is set and how long it is. */
+export const envStatus = (name) => (process.env[name] ? `set (${process.env[name].length} chars)` : "missing");
+
+// ---------- providers ----------
+export async function loadProviders() {
+  const out = {};
+  for (const f of fs.readdirSync(VOICES_DIR).filter((x) => x.endsWith(".mjs") && !x.startsWith("_"))) {
+    const p = (await import(pathToFileURL(path.join(VOICES_DIR, f)).href)).default;
+    if (!p?.name || typeof p.synth !== "function") throw new Error(`voices/${f}: default export needs name + synth()`);
+    out[p.name] = p;
+  }
+  return out;
 }
 
-export const clipKey = (input) =>
-  crypto.createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 16);
+/** Text actually sent to a provider: pronBy[engine] > pronEleven (legacy) > pron > text. */
+export const spokenFor = (line, engine) =>
+  line.pronBy?.[engine] ?? (engine === "eleven" ? line.pronEleven : undefined) ?? line.pron ?? line.text;
 
-export const isCached = (key) => fs.existsSync(path.join(CACHE, `${key}.json`));
+/** Which provider voices this line: --engine > speaker.engine > meta.voiceEngine > say. */
+export const engineFor = (script, speakerId, override) =>
+  override ?? script.speakers?.[speakerId]?.engine ?? script.meta?.voiceEngine ?? "say";
 
-/** ElevenLabs bills roughly one credit per character of spoken text. */
-export const creditEstimate = (text) => text.length;
+/**
+ * Work out everything about a line before generating it: provider, settings, cache key, cost.
+ * ctx: { sceneId, lineIndex, speakerId, line }
+ */
+export function planLine({ providers, engine, speaker, line, ctx, tempo = 1 }) {
+  const provider = providers[engine];
+  if (!provider) throw new Error(`unknown voice provider "${engine}" (have: ${Object.keys(providers).join(", ")})`);
+  const cfg = speaker?.[engine] ?? {};
+  const spoken = spokenFor(line, engine);
+  const key = crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ engine, cfg, spoken, text: line.text, tempo, extra: provider.cacheExtra?.(ctx, cfg) ?? null, v: CACHE_VERSION }))
+    .digest("hex")
+    .slice(0, 16);
+  const cached = fs.existsSync(path.join(CACHE, `${key}.json`)) && fs.existsSync(path.join(CACHE, `${key}.wav`));
+  const cost = cached ? 0 : (provider.cost?.(spoken, cfg) ?? 0);
+  return { provider, engine, cfg, spoken, key, cached, cost, ctx, tempo, text: line.text };
+}
 
+/** Provider pre-flight problems (e.g. missing recordings) for uncached lines. */
+export function preflight(plans) {
+  return plans
+    .filter((p) => !p.cached && p.provider.check)
+    .map((p) => p.provider.check(p.ctx, p.cfg))
+    .filter(Boolean);
+}
+
+/** Env vars a set of planned (uncached) lines needs but doesn't have. */
+export function missingEnv(plans) {
+  const need = new Set(plans.filter((p) => !p.cached).flatMap((p) => p.provider.env ?? []));
+  return [...need].filter((n) => !process.env[n]);
+}
+
+// ---------- shared audio processing ----------
 function ffmpeg(args) {
   execFileSync("ffmpeg", ["-v", "error", "-y", ...args], { stdio: ["ignore", "ignore", "inherit"] });
 }
 
-/** Convert any input to mono 16-bit WAV at SR, with optional pitch-preserving tempo. */
-function toClip(inArgs, out, tempo) {
-  const af = tempo && tempo !== 1 ? ["-af", `atempo=${tempo}`] : [];
-  ffmpeg([...inArgs, ...af, "-ar", String(SR), "-ac", "1", "-c:a", "pcm_s16le", out]);
-}
-
-/** Trim leading/trailing silence. Returns trimmed samples and the seconds removed from the start. */
 function trim(data) {
   const thr = 0.008;
   let a = 0;
@@ -54,7 +93,6 @@ function trim(data) {
   return { data: data.slice(a, b), offset: a / SR };
 }
 
-/** Level-match: RMS of the louder parts to a target, with a peak ceiling. */
 function levelMatch(data, rmsTarget = 0.1, peakCeil = 0.89) {
   let sum = 0;
   let n = 0;
@@ -72,16 +110,12 @@ function levelMatch(data, rmsTarget = 0.1, peakCeil = 0.89) {
   return data.map((v) => v * g);
 }
 
-/**
- * Estimate word timings when the engine gives none (macOS say).
- * Spreads the clip's duration across display words, weighted by length, with pauses for punctuation.
- */
+/** Spread a duration across display words by length, with pauses after punctuation. */
 function estimateWords(display, dur) {
-  const w = display.map((t) => {
-    const letters = norm(t).length || 1;
-    const pause = /[.!?]$/.test(t) ? 4 : /[,;:—–-]$/.test(t) ? 2.5 : 0;
-    return { len: Math.max(2, letters) + 1, pause };
-  });
+  const w = display.map((t) => ({
+    len: Math.max(2, norm(t).length || 1) + 1,
+    pause: /[.!?]$/.test(t) ? 4 : /[,;:—–-]$/.test(t) ? 2.5 : 0,
+  }));
   const total = w.reduce((s, x) => s + x.len + x.pause, 0);
   let t = 0;
   return display.map((text, i) => {
@@ -93,12 +127,9 @@ function estimateWords(display, dur) {
   });
 }
 
-/** Map ElevenLabs character alignment onto display words. */
-function alignWords(display, spoken, alignment, offset, tempo) {
-  const chars = alignment.characters;
-  const st = alignment.character_start_times_seconds;
-  const en = alignment.character_end_times_seconds;
-  // spoken word spans in character indices
+/** Character alignment → word spans (in source-audio seconds). */
+function wordsFromAlignment(alignment) {
+  const { characters: chars, character_start_times_seconds: st, character_end_times_seconds: en } = alignment;
   const spans = [];
   let cur = null;
   chars.forEach((c, i) => {
@@ -109,77 +140,53 @@ function alignWords(display, spoken, alignment, offset, tempo) {
     else cur.b = i;
   });
   if (cur) spans.push(cur);
-  const fix = (s) => Math.max(0, (s - offset) / tempo);
-  const sw = spans.map((s) => ({ start: fix(st[s.a]), end: fix(en[s.b]) }));
-  if (sw.length === display.length) return display.map((text, i) => ({ text, ...sw[i] }));
-  // pron rewrite changed the word count: spread display words over the spoken span
-  const dur = sw.length ? sw[sw.length - 1].end : 0;
-  const first = sw.length ? sw[0].start : 0;
-  return estimateWords(display, dur - first).map((w) => ({ ...w, start: w.start + first, end: w.end + first }));
+  return spans.map((s) => ({ start: st[s.a], end: en[s.b] }));
 }
 
-/**
- * Render one line. Returns { data: Float32Array @SR, words: [{text,start,end}] } with times in the clip.
- * opts: { engine, speaker (config), text (display), spoken, tempo }
- */
-export async function renderLine(opts) {
-  const { engine, speaker, text, spoken, tempo = 1 } = opts;
-  const key = clipKey({ engine, speaker: speaker[engine] ?? speaker, spoken, text, tempo, v: 1 });
+/** Provider word times (source seconds) → display words in clip seconds; falls back to estimating. */
+function mapWords(display, srcWords, offset, tempo, clipDur) {
+  if (!srcWords?.length) return estimateWords(display, clipDur);
+  const fix = (s) => Math.max(0, s / tempo - offset);
+  const sw = srcWords.map((w) => ({ start: fix(w.start), end: fix(w.end) }));
+  if (sw.length === display.length) return display.map((text, i) => ({ text, ...sw[i] }));
+  // a pron rewrite changed the word count: spread display words over the spoken span
+  const first = sw[0].start;
+  const last = sw[sw.length - 1].end;
+  return estimateWords(display, last - first).map((w) => ({ ...w, start: w.start + first, end: w.end + first }));
+}
+
+/** Generate (or load from cache) a planned line → { data: Float32Array @SR, words, cached }. */
+export async function renderPlanned(plan) {
+  const { provider, cfg, spoken, key, tempo, ctx, text } = plan;
   fs.mkdirSync(CACHE, { recursive: true });
   const wavPath = path.join(CACHE, `${key}.wav`);
   const metaPath = path.join(CACHE, `${key}.json`);
-  if (fs.existsSync(metaPath) && fs.existsSync(wavPath)) {
-    return { key, cached: true, data: readWav(wavPath).data, words: JSON.parse(fs.readFileSync(metaPath, "utf8")).words };
+  if (plan.cached) {
+    return { cached: true, data: readWav(wavPath).data, words: JSON.parse(fs.readFileSync(metaPath, "utf8")).words };
   }
-  const display = tokens(text);
   const tmp = path.join(CACHE, `${key}.tmp`);
-  let words;
-  let clip;
-  if (engine === "say") {
-    const cfg = speaker.say ?? {};
-    const args = ["-o", `${tmp}.aiff`];
-    if (cfg.voice) args.push("-v", cfg.voice);
-    if (cfg.rate) args.push("-r", String(cfg.rate));
-    execFileSync("say", [...args, spoken]);
-    toClip(["-i", `${tmp}.aiff`], wavPath, tempo);
-    fs.rmSync(`${tmp}.aiff`, { force: true });
-    const t = trim(readWav(wavPath).data);
-    clip = levelMatch(t.data);
-    words = estimateWords(display, clip.length / SR);
-  } else if (engine === "eleven") {
-    const cfg = speaker.eleven ?? {};
-    if (!cfg.voiceId) throw new Error(`speaker has no eleven.voiceId`);
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) throw new Error("ELEVENLABS_API_KEY missing — put it in .env");
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${cfg.voiceId}/with-timestamps?output_format=pcm_24000`,
-      {
-        method: "POST",
-        headers: { "xi-api-key": apiKey, "content-type": "application/json" },
-        body: JSON.stringify({
-          text: spoken,
-          model_id: cfg.model ?? "eleven_v4",
-          voice_settings: {
-            stability: cfg.stability ?? 0.45,
-            similarity_boost: cfg.similarity ?? 0.8,
-            speed: Math.min(1.2, cfg.speed ?? 1),
-          },
-        }),
-      },
-    );
-    if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const json = await res.json();
-    fs.writeFileSync(`${tmp}.pcm`, Buffer.from(json.audio_base64, "base64"));
-    toClip(["-f", "s16le", "-ar", "24000", "-ac", "1", "-i", `${tmp}.pcm`], wavPath, tempo);
+  const r = await provider.synth({ spoken, text, cfg, ctx, tmp });
+  const af = tempo !== 1 ? ["-af", `atempo=${tempo}`] : [];
+  const out = ["-ar", String(SR), "-ac", "1", "-c:a", "pcm_s16le", wavPath];
+  if (r.pcm) {
+    fs.writeFileSync(`${tmp}.pcm`, r.pcm);
+    ffmpeg(["-f", "s16le", "-ar", String(r.rate ?? 24000), "-ac", "1", "-i", `${tmp}.pcm`, ...af, ...out]);
     fs.rmSync(`${tmp}.pcm`, { force: true });
-    const t = trim(readWav(wavPath).data);
-    clip = levelMatch(t.data);
-    // alignment times are pre-tempo and pre-trim; trim offset is post-tempo
-    words = alignWords(display, spoken, json.alignment, t.offset * tempo, tempo);
+  } else if (r.file) {
+    try {
+      ffmpeg(["-i", r.file, ...af, ...out]);
+    } catch {
+      throw new Error(`ffmpeg couldn't read ${r.file} (from ${provider.name}). Re-export it as WAV and try again.`);
+    }
+    if (r.file.startsWith(tmp)) fs.rmSync(r.file, { force: true });
   } else {
-    throw new Error(`unknown voice engine "${engine}" (use say or eleven)`);
+    throw new Error(`voices/${provider.name}: synth() returned neither file nor pcm`);
   }
+  const t = trim(readWav(wavPath).data);
+  const clip = levelMatch(t.data);
+  const srcWords = r.alignment ? wordsFromAlignment(r.alignment) : r.words;
+  const words = mapWords(tokens(text), srcWords, t.offset, tempo, clip.length / SR);
   writeWav(wavPath, clip, SR);
-  fs.writeFileSync(metaPath, JSON.stringify({ words, engine, text, spoken }, null, 1));
-  return { key, cached: false, data: clip, words };
+  fs.writeFileSync(metaPath, JSON.stringify({ words, engine: provider.name, text, spoken, timings: srcWords ? "provider" : "estimated" }, null, 1));
+  return { cached: false, data: clip, words };
 }
