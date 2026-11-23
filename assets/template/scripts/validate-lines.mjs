@@ -4,9 +4,14 @@
 import { fileURLToPath } from "node:url";
 import { loadScript, tokens, norm, eachLine } from "./lib/script.mjs";
 import { SFX, MUSIC_MODES } from "./lib/synth.mjs";
+import { loadStyle, validateStyle, SCENE_STYLE_KEYS, FORMATS } from "./lib/style.mjs";
+
+const { defaults: DEFAULTS, overrides: OVERRIDES, style: STYLE } = loadStyle();
+const LEGACY_META = ["fps", "width", "height", "voiceEngine", "tempo", "bpm", "accent", "footer", "musicLevel", "autoWhoosh", "tail"];
 
 export function validate(script) {
-  const p = [];
+  const p = [...validateStyle(OVERRIDES, DEFAULTS)];
+  for (const k of LEGACY_META) if (script.meta && k in script.meta) p.push(`lines.json meta.${k} has moved to script/style.json`);
   if (!script.speakers || !Object.keys(script.speakers).length) p.push("no speakers defined");
   if (!Array.isArray(script.scenes) || !script.scenes.length) return [...p, "no scenes"];
   const ids = new Set();
@@ -15,7 +20,17 @@ export function validate(script) {
     if (ids.has(s.id)) p.push(`duplicate scene id "${s.id}"`);
     ids.add(s.id);
     if (s.music && !MUSIC_MODES[s.music]) p.push(`[${s.id}] unknown music mode "${s.music}" (${Object.keys(MUSIC_MODES).join(", ")})`);
-    if (s.captions && !["pop", "calm", "none"].includes(s.captions)) p.push(`[${s.id}] captions must be pop, calm or none`);
+    if (s.style) {
+      const allowed = Object.fromEntries(SCENE_STYLE_KEYS.map((k) => [k, DEFAULTS[k]]));
+      const own = Object.fromEntries(Object.entries(s.style).filter(([k]) => !(k in DEFAULTS) || k in allowed));
+      for (const k of Object.keys(s.style)) {
+        if (k in DEFAULTS && !(k in allowed)) {
+          const hint = k === "audio" ? ' (use the scene\'s "music" for its music mode)' : "";
+          p.push(`[${s.id}] style: "${k}" can only be set in style.json, not per scene — scenes can override ${SCENE_STYLE_KEYS.join(", ")}${hint}`);
+        }
+      }
+      p.push(...validateStyle(own, allowed, `[${s.id}] style`));
+    }
     for (const c of s.cues ?? []) if (!c.name) p.push(`[${s.id}] scene cue without a name`);
   }
   for (const { scene, li, line } of eachLine(script)) {
@@ -37,7 +52,7 @@ function report(script) {
   let words = 0;
   for (const s of script.scenes) {
     const tag = s.step != null ? `STEP ${s.step} · ${s.header ?? ""}` : (s.header ?? "");
-    console.log(`\n■ ${s.id}${tag ? `  (${tag})` : ""}  music: ${s.music ?? "groove"}`);
+    console.log(`\n■ ${s.id}${tag ? `  (${tag})` : ""}  music: ${s.music ?? STYLE.audio.musicMode}`);
     for (const l of s.lines ?? []) {
       const tk = tokens(l.text);
       words += tk.length;
@@ -48,7 +63,9 @@ function report(script) {
     }
   }
   const human = (words / 110) * 60;
-  console.log(`\n${words} words · ~${Math.round(human)} s of speech with human TTS (~110 wpm), plus pauses`);
+  const f = FORMATS[STYLE.format];
+  console.log(`\nformat: ${STYLE.format} ${f ? `${f.width}×${f.height}` : "(invalid)"} · ${STYLE.fps} fps · voice: ${STYLE.audio.voiceEngine} · music: ${STYLE.audio.music ? "on" : "off"} · sfx: ${STYLE.audio.sfx ? "on" : "off"}`);
+  console.log(`${words} words · ~${Math.round(human)} s of speech with human TTS (~110 wpm), plus pauses`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

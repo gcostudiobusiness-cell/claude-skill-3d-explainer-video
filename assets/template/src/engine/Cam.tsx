@@ -26,12 +26,16 @@ export function frustum(d: number, fov = 35, aspect = 9 / 16) {
 /**
  * Camera that puts a subject spanning world heights [bottom, top] between screen fractions
  * [topFrac, bottomFrac] (0 = top edge, 1 = bottom edge). Default keeps a ~2-unit character
- * in the middle band: below the header/card zone, above the captions (~85 %).
+ * in the middle band: below the header/card zone, above the captions (~85 %). screenX moves it sideways
+ * (landscape puts it on the left third). Prefer useLayout().shot, which fills these in per format.
  * Returns { position, lookAt, fov, halfW } — halfW is the visible half-width at z = 0.
  */
-export function frameSubject({ top = 2.05, bottom = 0, topFrac = 0.3, bottomFrac = 0.76, fov = 35, x = 0, aspect = 9 / 16 } = {}) {
+export function frameSubject({ top = 2.05, bottom = 0, topFrac = 0.3, bottomFrac = 0.76, screenX = 0.5, fov = 35, aspect = 9 / 16 } = {}) {
   const halfH = (top - bottom) / (2 * (bottomFrac - topFrac));
   const cy = bottom - (0.5 - bottomFrac) * 2 * halfH;
   const d = halfH / Math.tan(((fov / 2) * Math.PI) / 180);
-  return { position: [x, cy, d], lookAt: [x, cy, 0], fov, halfW: halfH * aspect };
+  const halfW = halfH * aspect;
+  // shift the camera sideways so world x = 0 lands at screenX (0 = left edge, 1 = right edge)
+  const cx = (0.5 - screenX) * 2 * halfW;
+  return { position: [cx, cy, d], lookAt: [cx, cy, 0], fov, halfW };
 }

@@ -39,8 +39,12 @@ Hemisphere + shadowed key + coloured rim + drei `Environment` built from `Lightf
 - Footer with name/label; end card / CTA.
 - Serious section switches to **calm captions**: full sentence, words light up as spoken.
 
-## Vertical layout zones (9:16)
-Header top ~10% · card zone ~12–45% · character middle · captions ~85%.
+## Layout zones per format (src/layout.ts)
+- **Portrait 9:16:** header top ~6% · cards ~14% · character 30–76% · captions ~85%.
+- **Landscape 16:9:** character on the left third · cards, stamp and title in a right-hand panel · captions
+  along the bottom · text at 0.75×.
+- **Square 1:1:** like portrait, tighter; the stamp is smaller and set right so it clears the face.
+- Always position through `useLayout()`, so one scene works in every format.
 
 ## Comedy toolkit that worked
 Hook question / "POV:" title in first 2 s · deadpan narrator · visual punchline on the last word · stamp slams ·

@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Final MP4 checks — all must pass before delivery.
-//   npm run verify            (checks out/video.mp4)
+//   npm run verify                 (checks out/video.mp4)
+//   npm run verify -- other.mp4
 // 1. decodes with zero errors   2. integrated loudness ≈ −14 LUFS
 // 3. contact sheet FROM THE MP4  4. last-second frame (end card)  → look at both images
+// 5. video size matches style.json "format"
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
+import { loadStyle, FORMATS } from "./lib/style.mjs";
 
 const file = process.argv[2] ?? "out/video.mp4";
 if (!fs.existsSync(file)) {
@@ -28,6 +31,12 @@ results.push(["contact sheet from MP4", sheet.status === 0, "out/verify/mp4-shee
 
 const last = run(["-y", "-v", "error", "-sseof", "-1", "-i", file, "-frames:v", "1", "-update", "1", "out/verify/endcard.png"]);
 results.push(["last-second frame", last.status === 0, "out/verify/endcard.png"]);
+
+// 5. size matches the format chosen in style.json
+const { style } = loadStyle();
+const want = FORMATS[style.format];
+const dims = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { encoding: "utf8" }).stdout.trim();
+results.push([`size matches format "${style.format}"`, want && dims === `${want.width},${want.height}`, dims.replace(",", "×")]);
 
 const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=width,height,r_frame_rate,codec_name", "-of", "csv=p=0", file], { encoding: "utf8" });
 console.log(probe.stdout.trim().split("\n").join(" · "));

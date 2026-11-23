@@ -1,6 +1,6 @@
 # Voice providers
 
-Each file here is one provider. Pick one per video with `meta.voiceEngine`, override it per speaker with
+Each file here is one provider. Pick one per video with `audio.voiceEngine` in `script/style.json`, override it per speaker with
 `speakers.<id>.engine`, or for a single build with `npm run audio -- --engine=<name>`. Provider settings live
 under the speaker, keyed by provider name:
 

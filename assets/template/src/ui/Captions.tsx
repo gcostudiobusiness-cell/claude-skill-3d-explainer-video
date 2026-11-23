@@ -1,21 +1,21 @@
 // Word-synced captions, driven entirely by timeline word times.
-//  pop  : 1–3 word chunks, springy pop-in, thick outline (paint-order), accent on highlight words
-//  calm : the full line, words light up as they are spoken (for serious sections)
-//  none : no captions for this scene
+//  pop  : chunks of up to captions.maxWords, springy pop-in, thick outline, accent on highlight words
+//  calm : the full line, words light up as spoken (serious sections)
+//  none : no captions
+// Everything (mode, size, case, outline, colours, position) comes from style.json / the scene's style.
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { TL, sceneAt, type Line, type Word } from "../timeline";
+import { styleFor } from "../style";
+import { useLayout } from "../layout";
 import { pop } from "../engine/anim";
-import { theme } from "./theme";
+import { fontStack, outlined } from "./text";
 
-const CHUNK_MAX = 3;
-
-/** Split a line's words into chunks of ≤3, breaking after punctuation. */
-function chunks(words: Word[]) {
+function chunks(words: Word[], max: number) {
   const out: Word[][] = [];
   let cur: Word[] = [];
   for (const w of words) {
     cur.push(w);
-    if (cur.length >= CHUNK_MAX || /[.!?,;:]$/.test(w.text)) {
+    if (cur.length >= max || /[.!?,;:]$/.test(w.text)) {
       out.push(cur);
       cur = [];
     }
@@ -29,25 +29,25 @@ function activeLine(sec: number): Line | null {
   return null;
 }
 
-export function Captions({ bottom = 0.15 }: { bottom?: number }) {
+export function Captions() {
   const frame = useCurrentFrame();
-  const { fps, height } = useVideoConfig();
-  const mode = sceneAt(frame).captions;
+  const { fps } = useVideoConfig();
+  const L = useLayout();
+  const st = styleFor(sceneAt(frame).id);
+  const c = st.captions;
   const sec = frame / fps;
   const line = activeLine(sec);
-  if (!line || mode === "none") return null;
+  if (!line || !c.show || c.mode === "none") return null;
+  const bottom = (c.bottom ?? L.captions.bottom) * L.height;
+  const k = L.fontScale * c.size;
+  const wrap = { justifyContent: "flex-end", alignItems: "center", paddingBottom: bottom } as const;
 
-  const outline = {
-    WebkitTextStroke: "14px #000",
-    paintOrder: "stroke fill",
-  } as const;
-
-  if (mode === "calm") {
+  if (c.mode === "calm") {
     return (
-      <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: height * bottom }}>
-        <div style={{ width: "84%", textAlign: "center", fontFamily: theme.body, fontWeight: 600, fontSize: 54, lineHeight: 1.35 }}>
+      <AbsoluteFill style={wrap}>
+        <div style={{ width: `${L.captions.maxWidth * 95}%`, textAlign: "center", fontFamily: fontStack(st.fonts.body), fontWeight: 600, fontSize: 54 * k, lineHeight: 1.35 }}>
           {line.words.map((w, i) => (
-            <span key={i} style={{ color: sec >= w.start ? (w.hl ? theme.accent : "#fff") : "rgba(255,255,255,0.35)", textShadow: "0 3px 12px rgba(0,0,0,.6)" }}>
+            <span key={i} style={{ color: sec >= w.start ? (w.hl ? st.colors.accent : st.colors.text) : st.colors.dimText, textShadow: "0 3px 12px rgba(0,0,0,.6)" }}>
               {w.text}{" "}
             </span>
           ))}
@@ -56,29 +56,28 @@ export function Captions({ bottom = 0.15 }: { bottom?: number }) {
     );
   }
 
-  const cs = chunks(line.words);
-  const idx = cs.findLastIndex((c) => sec >= c[0].start - 0.03);
+  const cs = chunks(line.words, Math.max(1, c.maxWords));
+  const idx = cs.findLastIndex((ch) => sec >= ch[0].start - 0.03);
   const chunk = cs[Math.max(0, idx)];
-  const at = Math.round(chunk[0].start * fps);
-  const s = pop(frame, at - 1, fps, 9);
+  const s = pop(frame, Math.round(chunk[0].start * fps) - 1, fps, 9);
   return (
-    <AbsoluteFill style={{ justifyContent: "flex-end", alignItems: "center", paddingBottom: height * bottom }}>
+    <AbsoluteFill style={wrap}>
       <div
         style={{
           transform: `scale(${0.6 + 0.4 * s}) rotate(${(1 - s) * -4}deg)`,
-          fontFamily: theme.body,
-          fontWeight: 800,
-          fontSize: 92,
+          fontFamily: fontStack(st.fonts.body),
+          fontWeight: c.weight,
+          fontSize: 92 * k,
           lineHeight: 1.05,
-          textTransform: "uppercase",
+          textTransform: c.uppercase ? "uppercase" : "none",
           textAlign: "center",
-          maxWidth: "88%",
-          color: "#fff",
-          ...outline,
+          maxWidth: `${L.captions.maxWidth * 100}%`,
+          color: st.colors.text,
+          ...outlined(st, c.outline * k),
         }}
       >
         {chunk.map((w, i) => (
-          <span key={i} style={{ color: w.hl ? theme.accent : "#fff" }}>
+          <span key={i} style={{ color: w.hl ? st.colors.accent : st.colors.text }}>
             {w.text}
             {i < chunk.length - 1 ? " " : ""}
           </span>

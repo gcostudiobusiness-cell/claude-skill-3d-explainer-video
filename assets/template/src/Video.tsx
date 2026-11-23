@@ -2,9 +2,7 @@
 //  - one persistent ThreeCanvas; each scene's 3D lives in a <Sequence layout="none"> inside it
 //  - each scene's HTML overlay in its own <Sequence> on top
 //  - global overlays (captions, step header, cut flash, vignette, footer) read the timeline directly
-import "@fontsource/anton/400.css";
-import "@fontsource/poppins/600.css";
-import "@fontsource/poppins/800.css";
+import { FONT_FACES } from "./fonts";
 import { useEffect, useState } from "react";
 import { AbsoluteFill, Html5Audio, Sequence, continueRender, delayRender, staticFile, useVideoConfig } from "remotion";
 import { ThreeCanvas } from "@remotion/three";
@@ -17,7 +15,7 @@ import { CutFlash, Footer, Vignette } from "./ui/Chrome";
 function useFonts() {
   const [handle] = useState(() => delayRender("fonts"));
   useEffect(() => {
-    Promise.all(["400 80px Anton", "600 40px Poppins", "800 40px Poppins"].map((f) => document.fonts.load(f)))
+    Promise.all(FONT_FACES.map((f) => document.fonts.load(f)))
       .then(() => continueRender(handle))
       .catch(() => continueRender(handle));
   }, [handle]);

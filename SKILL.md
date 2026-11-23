@@ -1,12 +1,13 @@
 ---
 name: 3d-explainer-video
-description: Make a vertical (1080×1920, 30 fps) 3D short-form explainer video with toy-style characters, narration, music, SFX and kinetic captions, in the style of a sample video and built from source material (a brief, notes, answers). Uses Remotion + three/react-three-fiber, ElevenLabs or macOS say for voice, a hand-written synth for music/SFX, and ffmpeg for mixing and verification. Runs a gated sequence — sample analysis → source extraction → script → voice audition → audio build → scenes → stills review → render → deliver. Trigger when the user asks to "make a 3D animated short", "make an explainer video in the style of this sample", "turn this brief/material into a video", or "make a TikTok/Reels/Shorts-style 3D video".
+description: Make a 3D explainer video — portrait 9:16, landscape 16:9 or square 1:1 — with toy-style characters, narration, music, SFX and kinetic captions, in the style of a sample video and built from source material (a brief, notes, answers). Uses Remotion + three/react-three-fiber, any voice provider (macOS say, ElevenLabs, own recordings, CLI TTS, OpenAI or a custom adapter), a hand-written synth for music/SFX, and ffmpeg for mixing and verification. Every aspect (format, colours, fonts, captions, effects, music, SFX, voice) is editable via style.json. Runs a gated sequence — sample analysis → source extraction → script → voice audition → audio build → scenes → stills review → render → deliver. Trigger when the user asks to "make a 3D animated short", "make an explainer video in the style of this sample", "turn this brief/material into a video", or "make a TikTok/Reels/Shorts-style 3D video".
 ---
 
 # 3D explainer video
 
 Input: a **sample video** (style reference) + **source material**.
-Output: a rendered **1080×1920, 30 fps MP4** — 3D toy-style characters, narration, music bed, SFX, kinetic captions.
+Output: a rendered **MP4 in the chosen orientation** (portrait 1080×1920, landscape 1920×1080 or square
+1080×1080, 30 fps) with 3D toy-style characters, narration, a music bed, SFX and kinetic captions.
 
 Origin: distilled from one real build (see `references/` for the detail). The gates exist because
 every expensive mistake in that build was either paid TTS credits spent on an unapproved script, or a visual bug
@@ -32,7 +33,8 @@ only visible by looking at rendered frames.
 |---|---|
 | Sample video path | — required |
 | Source material paths | — required |
-| Audience / platform | vertical short-form (TikTok/Reels/Shorts) |
+| Orientation | **ask** if the platform doesn't settle it: portrait 9:16 (TikTok, Reels, Shorts), landscape 16:9 (YouTube, web), square 1:1 (feeds). Default: match the sample. |
+| Audience / platform | from the brief; it usually decides the orientation |
 | Target length | match the sample; flag if the brief can't fit (rule 6) |
 | Voice provider | **ask**, and offer: `say` (free, robotic), ElevenLabs (paid, human, exact caption sync), own recordings, any command-line TTS (Piper, Kokoro, espeak…), OpenAI, or any other provider via a small adapter. Can differ per speaker. |
 | Names / labels shown on screen | none |
@@ -53,7 +55,9 @@ wait for the user.
   continuous VO/music. **Look at the contact sheets.**
 - Write a style vocabulary: aspect, length, character style, hook, caption style, header/progress device, cards,
   end card, audio bed.
-- **Exit:** style notes written (in the project, e.g. `notes/style.md`).
+- Translate it into `script/style.json`: format, colours, fonts, caption style, effects, music and SFX levels.
+  Everything not set keeps the defaults.
+- **Exit:** style notes written (e.g. `notes/style.md`) and a first `style.json`.
 
 ### 3. Source extraction
 - List every required section and every constraint (word counts, things that must be visible, tone limits,
@@ -87,7 +91,10 @@ wait for the user.
   `3d-and-overlays.md` are a toolbox, not a menu. Scenes don't have to follow any previous video.
 - One `SceneDef` (`Scene3D` + optional `SceneUI`) per scene kind, registered in `src/scenes/index.ts`, and all
   timed via `sf(scene)`. Unregistered scenes render with the default studio, so build them one at a time.
-- Frame with `frameSubject()` and keep props inside its `halfW` (`references/gotchas.md` → Framing).
+- Use `useLayout()` for the camera (`shot`) and for every on-screen position, never hard-coded numbers, so the
+  video works in any format. Keep props inside `shot.halfW` (`references/gotchas.md` → Framing).
+- On-screen text goes in the scene's `props` in lines.json, and colours/sizes in style, not in code. The user
+  can then change them without touching components.
 - **Exit:** typecheck clean (`--noUnusedLocals`); every scene renders a still.
 
 ### 8. Stills review loop — load `references/verify-and-render.md`
@@ -95,10 +102,10 @@ wait for the user.
 - **Exit:** at least **2 passes**; no off-screen props, clipped captions or broken poses.
 
 ### 9. Render + verify — load `references/verify-and-render.md`
-- `npm run render`, then `npm run verify`: decode check (0 errors), loudness (≈ −14 LUFS), contact sheet **from
-  the MP4**, last-second frame (end card). Look at both images.
+- `npm run render`, then `npm run verify`: decode check (0 errors), loudness (≈ target LUFS), contact sheet
+  **from the MP4**, last-second frame (end card), and size = chosen format. Look at both images.
 - Claude can't hear audio: ask the user to listen to the music/SFX balance before delivery.
-- **Exit:** all four checks pass.
+- **Exit:** all five checks pass.
 
 ### 10. Deliver ⛔
 - Copy the MP4 to the agreed location; report length, loudness, file size and what's recoverable.
@@ -127,4 +134,14 @@ Copy `assets/template/` to start every video (then `npm ci`). It is an **engine,
 - The demo in `src/scenes/example/` exists only to show the techniques, and to prove the engine renders. Delete
   or replace it; never default to its character or look.
 
-See `assets/template/README.md` for commands and how to add a scene.
+See `assets/template/README.md` for commands, how to add a scene, and the **"Change anything"** table. Use
+that table when the user asks to change something; `npm run validate` catches typos in style.json.
+
+## When the user asks for changes
+
+- **Look, layout and on-screen text** (format, colours, fonts, captions, header, effects, `props`): edit
+  `script/style.json` or lines.json, then `npm run preview` or Studio. No audio rebuild is needed.
+- **Words, voice, music, SFX, loudness, fps:** edit, then `npm run audio`. Voice lines are cached, so only
+  changed lines are regenerated. Paid providers re-show their cost first.
+- **Characters, sets, props, camera moves:** edit `src/scenes/`.
+- After any change: stills → look → render → verify. Never deliver an unchecked re-render.

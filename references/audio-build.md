@@ -12,7 +12,7 @@
   | `openai` (example, untested) | paid | estimated |
 
   Add a provider by writing one adapter file; the interface is in `scripts/voices/README.md`.
-- **Choice order:** `--engine` > `speakers.<id>.engine` > `meta.voiceEngine` > `say`. Speakers can use different
+- **Choice order:** `--engine` > `speakers.<id>.engine` > style.json `audio.voiceEngine` (default `say`). Speakers can use different
   providers in the same video.
 - **Shared processing for every provider:** ffmpeg normalise → optional `tempo` → trim silence → level-match
   (RMS target, peak ceiling) → word timings.

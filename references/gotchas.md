@@ -35,7 +35,10 @@ Decide early whether the brief or the format wins.
 ## Found while building the starter engine
 - Use `frameSubject()` (src/engine/Cam.tsx) instead of guessing camera numbers. In the first stills pass, a
   hand-placed camera hid the character's feet behind the captions and pushed a prop off the right edge.
-- Stamps default to the card zone (top ≈ 17 %); at 38 % they covered the character's face.
+- Stamps default to the card zone (top ≈ 17 %); at 38 % they covered the character's face. In square format
+  even 17 % hit the hair and header, so each format's stamp zone has its own size and position.
+- Don't hard-code colours in scene code: the example's stamp kept its colour after style.json changed it.
+  Read colours from `styleFor(scene.id)`.
 - `say` gives no word timings: the engine estimates them from word length and punctuation, so captions can
   drift slightly. ElevenLabs `with-timestamps` gives exact times.
 - On first render Remotion downloads its own headless Chrome (~140 MB) into node_modules. That's expected and

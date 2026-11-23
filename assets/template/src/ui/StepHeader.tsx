@@ -1,27 +1,34 @@
-// "STEP N · LABEL" header with progress dashes. Shown for scenes that have a `step`.
+// "STEP N · LABEL" header with progress dashes, for scenes that have a `step`. style: header.show/dashes/size.
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { TL, sceneAt } from "../timeline";
+import { styleFor } from "../style";
+import { useLayout } from "../layout";
 import { pop } from "../engine/anim";
-import { theme } from "./theme";
+import { fontStack, outlined } from "./text";
 
 export function StepHeader() {
   const frame = useCurrentFrame();
-  const { fps, height } = useVideoConfig();
+  const { fps } = useVideoConfig();
+  const L = useLayout();
   const s = sceneAt(frame);
-  if (s.step == null || !TL.totalSteps) return null;
-  const k = pop(frame, s.startFrame + 2, fps, 13);
+  const st = styleFor(s.id);
+  if (s.step == null || !TL.totalSteps || !st.header.show) return null;
+  const k = L.fontScale * st.header.size;
+  const p = pop(frame, s.startFrame + 2, fps, 13);
   return (
-    <AbsoluteFill style={{ alignItems: "center", paddingTop: height * 0.06 }}>
-      <div style={{ transform: `translateY(${(1 - k) * -60}px)`, opacity: Math.min(1, k * 1.5), textAlign: "center" }}>
-        <div style={{ fontFamily: theme.title, fontSize: 64, letterSpacing: 2, color: "#fff", WebkitTextStroke: "10px #000", paintOrder: "stroke fill" }}>
+    <AbsoluteFill style={{ alignItems: "center", paddingTop: L.height * L.header.top }}>
+      <div style={{ transform: `translateY(${(1 - p) * -60}px)`, opacity: Math.min(1, p * 1.5), textAlign: "center" }}>
+        <div style={{ fontFamily: fontStack(st.fonts.title), fontSize: 64 * k, letterSpacing: 2, color: st.colors.text, ...outlined(st, 10 * k) }}>
           STEP {s.step}
-          {s.header ? <span style={{ color: theme.accent }}> · {s.header}</span> : null}
+          {s.header ? <span style={{ color: st.colors.accent }}> · {s.header}</span> : null}
         </div>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 14 }}>
-          {Array.from({ length: TL.totalSteps }, (_, i) => (
-            <div key={i} style={{ width: 110, height: 18, borderRadius: 9, border: "4px solid #000", background: i < s.step! ? theme.accent : "rgba(255,255,255,.6)" }} />
-          ))}
-        </div>
+        {st.header.dashes ? (
+          <div style={{ display: "flex", gap: 12 * k, justifyContent: "center", marginTop: 14 * k }}>
+            {Array.from({ length: TL.totalSteps }, (_, i) => (
+              <div key={i} style={{ width: 110 * k, height: 18 * k, borderRadius: 9 * k, border: `${4 * k}px solid ${st.colors.outline}`, background: i < s.step! ? st.colors.accent : "rgba(255,255,255,.6)" }} />
+            ))}
+          </div>
+        ) : null}
       </div>
     </AbsoluteFill>
   );

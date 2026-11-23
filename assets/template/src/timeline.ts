@@ -11,7 +11,6 @@ export type Scene = {
   index: number;
   step: number | null;
   header: string | null;
-  captions: "pop" | "calm" | "none";
   music: string;
   props: Record<string, unknown>;
   start: number;
@@ -23,13 +22,10 @@ export type Scene = {
 };
 export type Timeline = {
   fps: number;
-  width: number;
-  height: number;
   duration: number;
   durationInFrames: number;
   title: string;
-  footer: string;
-  accent: string;
+  engines: string[];
   totalSteps: number;
   scenes: Scene[];
   mouth: Record<string, number[]>;

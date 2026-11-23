@@ -31,5 +31,6 @@ ffmpeg -sseof -1 -i out/video.mp4 -frames:v 1 endcard.png                   # la
 ```
 
 ## In the template these are npm scripts
-`npm run stills -- mid,beats pass1` · `npm run render` · `npm run verify` (runs all four checks above and
-writes `out/verify/mp4-sheet.jpg` + `out/verify/endcard.png`).
+`npm run stills -- mid,beats pass1` · `npm run preview` (audio + stills) · `npm run render` · `npm run verify`
+(runs the four checks above, plus size = style.json format, and writes `out/verify/mp4-sheet.jpg` +
+`out/verify/endcard.png`).

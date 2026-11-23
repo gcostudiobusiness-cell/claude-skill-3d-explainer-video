@@ -4,7 +4,8 @@
 //   npm run audio -- --dry-run          what would be voiced, by which provider, and what it costs
 //   npm run audio -- --yes              allow a run above MAX_CREDITS (billable units, any paid provider)
 //   npm run audio -- --engine=<name>    voice every line with one provider (say, eleven, recording, command, openai…)
-// Provider per line: --engine > speakers.<id>.engine > meta.voiceEngine > say. See scripts/voices/README.md.
+// Provider per line: --engine > speakers.<id>.engine > style.audio.voiceEngine. See scripts/voices/README.md.
+// Audio settings (music, SFX, levels, loudness, tempo, fps) come from script/style.json.
 // Outputs: public/audio/master.wav, src/timeline.json
 import fs from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -13,6 +14,7 @@ import { loadEnv, envStatus, loadProviders, engineFor, planLine, renderPlanned, 
 import { SR, SFX, renderMusic, sting, mixAt } from "./lib/synth.mjs";
 import { writeWav } from "./lib/wav.mjs";
 import { validate } from "./validate-lines.mjs";
+import { loadStyle } from "./lib/style.mjs";
 
 const args = process.argv.slice(2);
 const flag = (n) => args.includes(`--${n}`);
@@ -27,10 +29,11 @@ if (problems.length) {
   process.exit(1);
 }
 
-const meta = script.meta ?? {};
-const fps = meta.fps ?? 30;
-const tempo = meta.tempo ?? 1;
-const bpm = meta.bpm ?? 112;
+const { style } = loadStyle();
+const A = style.audio;
+const fps = style.fps;
+const tempo = A.tempo;
+const bpm = A.bpm;
 const MAX_CREDITS = Number(process.env.MAX_CREDITS ?? 3000);
 const providers = await loadProviders();
 
@@ -38,7 +41,7 @@ const providers = await loadProviders();
 let jobs;
 try {
   jobs = [...eachLine(script)].map(({ scene, line, li }) => {
-    const engine = engineFor(script, line.speaker, opt("engine"));
+    const engine = engineFor(script, line.speaker, opt("engine"), A.voiceEngine);
     const ctx = { sceneId: scene.id, lineIndex: li, speakerId: line.speaker, line };
     return { scene, line, ...planLine({ providers, engine, speaker: script.speakers[line.speaker], line, ctx, tempo }) };
   });
@@ -121,8 +124,7 @@ for (const [index, scene] of script.scenes.entries()) {
     index,
     step: scene.step ?? null,
     header: scene.header ?? null,
-    captions: scene.captions ?? "pop",
-    music: scene.music ?? "groove",
+    music: A.music ? (scene.music ?? A.musicMode) : "none",
     props: scene.props ?? {},
     start,
     end,
@@ -133,7 +135,7 @@ for (const [index, scene] of script.scenes.entries()) {
   });
   t = end;
 }
-const total = t + (meta.tail ?? 0.5);
+const total = t + A.tail;
 const N = Math.ceil(total * SR);
 
 // ---------- 3. buses ----------
@@ -146,18 +148,19 @@ for (const p of placed) {
 }
 const modeAt = (time) => (scenes.find((s) => time >= s.start && time < s.end) ?? scenes[scenes.length - 1]).music;
 const music = renderMusic(total, bpm, modeAt);
-mixAt(music, sting(), Math.max(0, scenes[scenes.length - 1].end - 1.0), 0.8);
+if (A.music && A.endSting) mixAt(music, sting(), Math.max(0, scenes[scenes.length - 1].end - 1.0), 0.8);
 
 const sfx = new Float32Array(N);
 const drops = [];
 scenes.forEach((s, i) => {
-  if (i > 0 && meta.autoWhoosh !== false) mixAt(sfx, SFX.whoosh(), s.start - 0.15, 0.5);
+  const gainOf = (name) => A.sfxGain[name] ?? 1;
+  if (A.sfx && i > 0 && A.autoWhoosh) mixAt(sfx, SFX.whoosh(), s.start - 0.15, 0.5 * gainOf("whoosh"));
   for (const c of s.cues) {
-    if (!c.sound) continue;
+    if (!c.sound || !A.sfx) continue;
     const make = SFX[c.name];
     if (!make) continue;
     const clip = make();
-    mixAt(sfx, clip, c.t, c.gain ?? 0.7);
+    mixAt(sfx, clip, c.t, (c.gain ?? 0.7) * gainOf(c.name));
     // comedic beats: silence the music under the effect (trombone drops by default)
     const drop = c.dropMusic ?? (c.name === "trombone" ? clip.length / SR : 0);
     if (drop) drops.push([c.t, c.t + drop]);
@@ -169,11 +172,11 @@ scenes.forEach((s, i) => {
 const att = Math.exp(-1 / (0.01 * SR));
 const rel = Math.exp(-1 / (0.25 * SR));
 let e = 0;
-const musicLevel = meta.musicLevel ?? 0.32;
+const musicLevel = A.musicLevel;
 for (let i = 0; i < N; i++) {
   const a = Math.abs(voice[i]);
   e = a > e ? att * e + (1 - att) * a : rel * e + (1 - rel) * a;
-  let g = musicLevel * (1 - 0.6 * Math.min(1, e / 0.08));
+  let g = musicLevel * (1 - A.duck * Math.min(1, e / 0.08));
   const time = i / SR;
   for (const [d0, d1] of drops) {
     if (time > d0 - 0.05 && time < d1 + 0.3) {
@@ -185,14 +188,14 @@ for (let i = 0; i < N; i++) {
   music[i] = (music[i] ?? 0) * g;
 }
 const mix = new Float32Array(N);
-for (let i = 0; i < N; i++) mix[i] = Math.tanh(voice[i] + music[i] + sfx[i] * 0.6); // soft clip
+for (let i = 0; i < N; i++) mix[i] = Math.tanh(voice[i] + music[i] + sfx[i] * A.sfxLevel); // soft clip
 
 fs.mkdirSync("cache", { recursive: true });
 fs.mkdirSync("public/audio", { recursive: true });
 writeWav("cache/mix.wav", mix, SR);
 
 // two-pass loudnorm to -14 LUFS
-const LN = "I=-14:TP=-1.5:LRA=11";
+const LN = `I=${A.loudness}:TP=-1.5:LRA=11`;
 const r1 = spawnSync(
   "ffmpeg",
   ["-hide_banner", "-i", "cache/mix.wav", "-af", `loudnorm=${LN}:print_format=json`, "-f", "null", "-"],
@@ -227,13 +230,9 @@ for (const [spk, bus] of Object.entries(perSpeaker)) {
 const steps = scenes.map((s) => s.step).filter((x) => x != null);
 const timeline = {
   fps,
-  width: meta.width ?? 1080,
-  height: meta.height ?? 1920,
   duration: total,
   durationInFrames: frames,
-  title: meta.title ?? "",
-  footer: meta.footer ?? "",
-  accent: meta.accent ?? "#FFD23F",
+  title: script.meta?.title ?? "",
   totalSteps: steps.length ? Math.max(...steps) : 0,
   engines: [...new Set(jobs.map((j) => j.engine))],
   scenes,
@@ -241,5 +240,5 @@ const timeline = {
 };
 fs.writeFileSync("src/timeline.json", JSON.stringify(timeline));
 console.log(
-  `✓ public/audio/master.wav + src/timeline.json · ${total.toFixed(2)} s · ${frames} frames · ${scenes.length} scenes · input ${m.input_i} LUFS → -14`,
+  `✓ public/audio/master.wav + src/timeline.json · ${total.toFixed(2)} s · ${frames} frames · ${scenes.length} scenes · input ${m.input_i} LUFS → ${A.loudness}`,
 );

@@ -40,9 +40,9 @@ export async function loadProviders() {
 export const spokenFor = (line, engine) =>
   line.pronBy?.[engine] ?? (engine === "eleven" ? line.pronEleven : undefined) ?? line.pron ?? line.text;
 
-/** Which provider voices this line: --engine > speaker.engine > meta.voiceEngine > say. */
-export const engineFor = (script, speakerId, override) =>
-  override ?? script.speakers?.[speakerId]?.engine ?? script.meta?.voiceEngine ?? "say";
+/** Which provider voices this line: --engine > speaker.engine > style.audio.voiceEngine > say. */
+export const engineFor = (script, speakerId, override, fallback = "say") =>
+  override ?? script.speakers?.[speakerId]?.engine ?? fallback;
 
 /**
  * Work out everything about a line before generating it: provider, settings, cache key, cost.

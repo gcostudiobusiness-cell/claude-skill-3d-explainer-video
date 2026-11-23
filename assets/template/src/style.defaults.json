@@ -1,0 +1,54 @@
+{
+  "format": "portrait",
+  "fps": 30,
+  "colors": {
+    "accent": "#FFD23F",
+    "text": "#FFFFFF",
+    "outline": "#000000",
+    "dimText": "rgba(255,255,255,0.35)",
+    "stamp": "#E23B3B",
+    "flash": "#FFFFFF"
+  },
+  "fonts": {
+    "title": "Anton",
+    "body": "Poppins"
+  },
+  "captions": {
+    "show": true,
+    "mode": "pop",
+    "size": 1,
+    "maxWords": 3,
+    "uppercase": true,
+    "outline": 14,
+    "weight": 800,
+    "bottom": null
+  },
+  "header": {
+    "show": true,
+    "dashes": true,
+    "size": 1
+  },
+  "effects": {
+    "cutFlash": true,
+    "vignette": 0.45,
+    "cardStyle": "glass",
+    "footer": true
+  },
+  "footer": "",
+  "audio": {
+    "voiceEngine": "say",
+    "tempo": 1,
+    "music": true,
+    "musicLevel": 0.32,
+    "musicMode": "groove",
+    "bpm": 112,
+    "duck": 0.6,
+    "sfx": true,
+    "sfxLevel": 0.6,
+    "sfxGain": {},
+    "autoWhoosh": true,
+    "endSting": true,
+    "loudness": -14,
+    "tail": 0.5
+  }
+}

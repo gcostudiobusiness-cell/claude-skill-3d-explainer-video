@@ -1,8 +1,11 @@
 # 3d-explainer-video
 
 A [Claude Code](https://claude.com/claude-code) skill that turns a **sample video** (style reference) and
-**source material** (a brief, notes, answers) into a finished **vertical 3D explainer video**: 1080×1920, 30 fps
+**source material** (a brief, notes, answers) into a finished **3D explainer video**: portrait, landscape or square, 30 fps
 MP4 with toy-style 3D characters, narration, a music bed, sound effects and kinetic captions.
+
+It works in portrait 9:16, landscape 16:9 or square 1:1, and everything about the result can be changed from
+two plain files: `lines.json` for words and on-screen text, `style.json` for look and sound.
 
 It is a workflow, not a library. The skill tells Claude what to build, in what order, and where to stop and ask
 you before spending money or publishing anything.
@@ -88,7 +91,7 @@ Claude loads each reference file only during the phase that needs it, which keep
 - The method and references come from one real build.
 - **Starter engine included** in [`assets/template/`](assets/template/): the audio pipeline, timeline helpers,
   camera/lighting/studio helpers, overlays, and the stills and verification tools. A clean copy installs, builds
-  audio with `say`, renders a 15-second demo and passes all four MP4 checks.
+  audio with `say`, renders a 15-second demo and passes all MP4 checks, in portrait and landscape.
 - The engine is reused; each video's characters, sets and scenes are designed fresh from its sample. The demo
   scenes in `src/scenes/example/` are only there to show the techniques.
 - Not yet tested: the ElevenLabs path against the live API. Its code, cost dry run and credit guard are in

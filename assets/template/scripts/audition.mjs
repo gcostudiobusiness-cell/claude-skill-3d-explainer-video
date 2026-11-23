@@ -9,6 +9,7 @@ import { loadScript, eachLine } from "./lib/script.mjs";
 import { loadEnv, loadProviders, planLine, renderPlanned, missingEnv } from "./lib/voices.mjs";
 import { writeWav } from "./lib/wav.mjs";
 import { SR } from "./lib/synth.mjs";
+import { loadStyle } from "./lib/style.mjs";
 
 loadEnv();
 const pos = process.argv.slice(2).filter((x) => !x.startsWith("--"));
@@ -35,7 +36,7 @@ const plans = voicesArg.split(",").filter(Boolean).flatMap((voice) =>
     const base = script.speakers[line.speaker]?.[engine] ?? {};
     const speaker = { [engine]: { ...base, [provider.voiceField]: voice } };
     const ctx = { sceneId: scene.id, lineIndex: li, speakerId: line.speaker, line };
-    return { voice, i, plan: planLine({ providers, engine, speaker, line, ctx, tempo: script.meta?.tempo ?? 1 }) };
+    return { voice, i, plan: planLine({ providers, engine, speaker, line, ctx, tempo: loadStyle().style.audio.tempo }) };
   }),
 );
 const cost = plans.reduce((s, p) => s + p.plan.cost, 0);
