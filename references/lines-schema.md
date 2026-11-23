@@ -14,7 +14,7 @@
 ## Writing rules
 - Short lines; put the punchline on the last word (the visual punchline lands there too).
 - Pick a narrative device that makes the content funny, ideally one that matches a section of the brief itself
-  (digital-mirror: the subject's phone narrates and roasts him).
+  (example that worked: the subject's phone narrates and roasts him).
 - Humour only about the subject matter; respect every tone constraint in the brief.
 - A serious section (e.g. a reflection) gets calm captions and soft music.
 
