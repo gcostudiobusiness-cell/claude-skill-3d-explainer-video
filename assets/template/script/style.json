@@ -1,0 +1,6 @@
+{
+  "format": "portrait",
+  "colors": { "accent": "#FFD23F" },
+  "footer": "your name · your label",
+  "audio": { "voiceEngine": "say" }
+}

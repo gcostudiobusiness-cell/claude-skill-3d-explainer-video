@@ -1,8 +1,11 @@
 # 3d-explainer-video
 
 A [Claude Code](https://claude.com/claude-code) skill that turns a **sample video** (style reference) and
-**source material** (a brief, notes, answers) into a finished **vertical 3D explainer video**: 1080×1920, 30 fps
+**source material** (a brief, notes, answers) into a finished **3D explainer video**: portrait, landscape or square, 30 fps
 MP4 with toy-style 3D characters, narration, a music bed, sound effects and kinetic captions.
+
+It works in portrait 9:16, landscape 16:9 or square 1:1, and everything about the result can be changed from
+two plain files: `lines.json` for words and on-screen text, `style.json` for look and sound.
 
 It is a workflow, not a library. The skill tells Claude what to build, in what order, and where to stop and ask
 you before spending money or publishing anything.
@@ -24,8 +27,10 @@ Ask in plain words, for example:
 
 > Make a 3D animated short in the style of `sample.mp4` from `brief.md`.
 
-Claude asks only what has no sensible default. The main question is how to do the voice: macOS `say` (free,
-robotic), ElevenLabs (paid, human) or your own recording.
+Claude asks only what has no sensible default. The main question is the voice provider, and you can use any:
+macOS `say` (free, robotic), ElevenLabs (paid, human, exact caption sync), your own recordings, a command-line
+TTS such as Piper or Kokoro, OpenAI, or any other service through a small adapter. Different speakers can use
+different providers.
 
 ## How it works
 
@@ -55,7 +60,7 @@ the script and rebuild the audio, the visuals re-sync on their own. Nothing is t
 | Video engine | Remotion 4 |
 | 3D | three.js, @react-three/fiber, @react-three/drei, @remotion/three |
 | UI | React 19, TypeScript, lucide-react, local fonts (Anton, Poppins) |
-| Voice | ElevenLabs `with-timestamps` (word-level caption sync) or macOS `say` |
+| Voice | Your choice: macOS `say`, ElevenLabs (exact caption sync), own recordings, any command-line TTS, OpenAI, or any provider via a small adapter |
 | Music and sound effects | Hand-written Node synth, so there are no licensing questions |
 | Audio processing and checks | ffmpeg |
 
@@ -76,6 +81,7 @@ references/
   3d-and-overlays.md             characters, sets, props, lighting, captions, comedy toolkit
   verify-and-render.md           ffmpeg analysis, stills, render and MP4 checks
   gotchas.md                     known pitfalls and their fixes
+assets/template/                 starter engine: copy to begin a video (see its README)
 ```
 
 Claude loads each reference file only during the phase that needs it, which keeps the context small.
@@ -83,6 +89,10 @@ Claude loads each reference file only during the phase that needs it, which keep
 ## Status
 
 - The method and references come from one real build.
-- **No starter code yet:** the audio build scripts, synth, stills tool, overlays, character and prop kit, and an
-  example `lines.json` don't exist as reusable code. For now Claude builds them from the reference files for each
-  video. A starter template is planned.
+- **Starter engine included** in [`assets/template/`](assets/template/): the audio pipeline, timeline helpers,
+  camera/lighting/studio helpers, overlays, and the stills and verification tools. A clean copy installs, builds
+  audio with `say`, renders a 15-second demo and passes all MP4 checks, in portrait and landscape.
+- The engine is reused; each video's characters, sets and scenes are designed fresh from its sample. The demo
+  scenes in `src/scenes/example/` are only there to show the techniques.
+- Not yet tested: the ElevenLabs path against the live API. Its code, cost dry run and credit guard are in
+  place, but they need a real key to test.
